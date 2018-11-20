@@ -1,0 +1,22 @@
+{
+  "name": "idsearch",
+  "version": "1.0.0",
+  "description": "Insert ID Mapping into Elastic Search Cluster from Uniprot Mapping Files",
+  "main": "idsearch.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ID",
+    "Mapping",
+    "Search"
+  ],
+  "author": "Laurent-Philippe Albou",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "fs": "0.0.1-security",
+    "readline": "^1.3.0",
+    "zlib": "^1.0.5"
+  }
+}
