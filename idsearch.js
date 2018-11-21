@@ -33,7 +33,7 @@ const wait_after_submit = 1;
 
 if(willCreateIndex) {
     createIndex(index_name);
-    sleep(2);
+    sleep.sleep(2);
 }
 
 
