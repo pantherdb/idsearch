@@ -2,46 +2,59 @@ const fs = require('fs');
 const zlib = require('zlib');
 const readline = require('readline');
 const axios = require('axios')
+var sleep = require('sleep');
 
 // const esearch_url = "http://localhost:9200";
-const esearch_url = "https://search-panther-eb636tdq5a6sm5oeu7pi5ldtpe.us-west-1.es.amazonaws.com";
-const index_name = "id";
-const type_name = "mapping";
+// const esearch_url = "https://search-panther-eb636tdq5a6sm5oeu7pi5ldtpe.us-west-1.es.amazonaws.com";
 
-const max_docs_per_post = 5000;
-
-if (process.argv.length <= 2) {
-    console.log("Usage: " + __filename + " <mapping.gz:file>");
+if (process.argv.length <= 4) {
+    console.log("Usage: " + __filename + " <elasticsearch:ip> <mapping.gz:file> <taxon:id> [optional: <create_index:true/false>]\n");
     process.exit(-1);
 }
 
 
-// listIndex();
-// deleteIndex(index_name);
-createIndex(index_name);
-
-
 const args = process.argv.slice(2)
-console.log("> reading file ", args[0]);
+const esearch_url = args[0];
+const file = args[1];
+const taxon = args[2];
+
+let willCreateIndex = false;
+if(args.length == 4) {
+    willCreateIndex = (args[3] == "true");
+}
+
+console.log("> elastic search server: " + esearch_url);
+
+const index_name = "id";
+const type_name = "mapping";
+const max_docs_per_post = 1000;
+const wait_after_submit = 1;
 
 
-const gzFileInput = fs.createReadStream(args[0]);
+if(willCreateIndex) {
+    createIndex(index_name);
+}
+
+
+console.log("> taxon defined: " + taxon);
+console.log("> reading file " + file);
+
+const gzFileInput = fs.createReadStream(file);
 const gunzip = zlib.createGunzip();
 
 let lineCount = 0;
+let docCount = 1;
 
-let map = new Map();
+// batch of docs to be submitted
+let docs = [];
 
 readline.createInterface({
     input: gunzip,
 }).on('line', line => {
     lineCount++;
-    // if(lineCount > 10000) {
-    //     process.exit(-1);
-    // }
     parse(line);
 }).on('close', () => {
-    addMap(lines);
+    submit();
     console.log(lineCount + " lines read (" + docCount + " docs)");
 });
 
@@ -57,6 +70,10 @@ let lines = undefined;
 function parse(line) {
     let split = line.split("\t");
     if(current != id(split[0])) {
+        // add the taxon based on user parameter
+        if(lines && lines.length > 0) {
+            lines.push([lines[lines.length - 1][0], "taxon", taxon]);
+        }
         addMap(lines);
         current = id(split[0]);
         lines = [];
@@ -64,14 +81,16 @@ function parse(line) {
     lines.push(split);
 }
 
+/**
+ * Trim any isoform in the id (in the form -X)
+ * @param {*} id 
+ */
 function id(id) {
     let pos = id.indexOf("-");
     if(pos == -1) return id;
     return id.substring(0, pos);
 }
 
-let docCount = 1;
-let docs = [];
 function addMap(lines) {
     let data = { };
 
@@ -88,7 +107,7 @@ function addMap(lines) {
         data = undefined;
     }
 
-    if(docs.length >= max_docs_per_post || (!lines || lines.length == 0)) {
+    if(docs.length >= max_docs_per_post) {
         submit();
         docs = [];
     }
@@ -96,27 +115,16 @@ function addMap(lines) {
     if(data)
         docs.push(data);
 
-
-//     axios.post(esearch_url + "/" + index_name + "/" + type_name + "/" + docCount++ + "?pretty", JSON.stringify(data), {
-//         headers: {
-//             'Content-Type': 'application/json',
-//         }
-//     })    
-//     .then(response => {
-// //        console.log(response);
-//     })
-//     .catch(error => {
-//         console.error(error);
-//     });
 }
 
 function submit() {
+    if(docs.length == 0) return;
+
     console.log("Submit " + docs.length + " docs\t (total: " + docCount + ")");
     let data = "";
     for(let doc of docs) {
         data += "{\"index\": {} }\n" + JSON.stringify(doc) + "\n";
     }
-//    console.log("SUBMITTING: ", data);
     axios.post(esearch_url + "/" + index_name + "/" + type_name + "/_bulk" + "?pretty", data, {
         headers: {
             'Content-Type': 'application/json',
@@ -127,13 +135,15 @@ function submit() {
     })
     .catch(error => {
         console.error(error);
-    });    
+        console.error("DATA: ", data);
+    });
+    sleep.sleep(wait_after_submit);
 }
 
 function deleteIndex(name) {
     axios.delete(esearch_url + "/" + name + "?pretty")
     .then(response => {
-        console.log(response);
+        console.log("Index <" + name + "> was successfully deleted");
     })
     .catch(error => {
         console.error(error);
@@ -141,7 +151,6 @@ function deleteIndex(name) {
 }
 
 function createIndex(name) {
-    console.log(esearch_url + "/" + name + "?pretty")
     let data = 
         {
             "settings": {
@@ -183,7 +192,7 @@ function createIndex(name) {
         }
     })    
     .then(response => {
-        console.log(response);
+        console.log("Index <" + name + "> was successfully created");
     })
     .catch(error => {
         console.error(error);
