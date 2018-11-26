@@ -33,6 +33,7 @@ const wait_after_submit = 1;
 
 if(willCreateIndex) {
     createIndex(index_name);
+    createTemplate("t_search_key_taxon");
     sleep.sleep(2);
 }
 
@@ -220,6 +221,40 @@ function createIndex(name) {
         console.error(error);
     });
 }
+
+
+function createTemplate(template_name) {
+    let data = 
+    {
+        "script": {
+            "lang": "mustache",
+            "source": {
+                "_source": { "excludes": ["all", "any"] },
+                "size": 1,
+                "query": {
+                    "bool": {
+                        "must": [
+                            { "term": { "NCBI_TaxID": "{{taxon_id}}" } },
+                            { "term": { "any": "{{query_string}}" } }
+                        ]
+                    }
+                }
+            }
+        }
+    };
+    axios.put(esearch_url + "/_scripts/" + template_name + "?pretty", JSON.stringify(data), {
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })    
+    .then(response => {
+        console.log("Query template <" + template_name + "> was successfully created");
+    })
+    .catch(error => {
+        console.error(error);
+    });
+}
+
 
 function listIndex() {
     axios.get(esearch_url + "/_cat/indices?v&pretty")
