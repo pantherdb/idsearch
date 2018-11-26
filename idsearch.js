@@ -73,7 +73,19 @@ function parse(line) {
     if(current != id(split[0])) {
         // add the taxon based on user parameter
         if(lines && lines.length > 0) {
-            lines.push([lines[lines.length - 1][0], "taxon", taxon]);
+            // I don't think we have the UniProtKB-AC field yet ?
+            lines.push([lines[lines.length - 1][0], "UniProtKB-AC", lines[lines.length - 1][0] ]);
+            
+            // manually add the NCBI_TaxID if missing
+            let found = false;
+            for(let line of lines) {
+                if(line[1] == "NCBI_TaxID")
+                    found = true;
+            }
+            if(!found) { 
+                console.log("NCBI_TaxID was not present for " , lines);
+                lines.push([lines[lines.length - 1][0], "NCBI_TaxID", taxon]);
+            }
         }
         addMap(lines);
         current = id(split[0]);
@@ -92,6 +104,10 @@ function id(id) {
     return id.substring(0, pos);
 }
 
+/**
+ * Note: could set the document ID to the uniprot AC number, I think it would work and give consistency to search acrosss multiple versions
+ * @param {*} lines 
+ */
 function addMap(lines) {
     let data = { };
 
@@ -102,7 +118,9 @@ function addMap(lines) {
             set.add(line[2]);
             set.add(line[0]);
         }
+        // data['_id'] = data["UniProtKB-AC"];
         data['all'] = Array.from(set).join(" ");
+        data['any'] = Array.from(set);
         docCount++;
     } else {
         data = undefined;
@@ -124,7 +142,7 @@ function submit() {
     console.log("Submit " + docs.length + " docs\t (total: " + docCount + ")");
     let data = "";
     for(let doc of docs) {
-        data += "{\"index\": {} }\n" + JSON.stringify(doc) + "\n";
+        data += "{\"index\": {\"_id\": \"" + doc["UniProtKB-AC"] + "\"} }\n" + JSON.stringify(doc) + "\n";
     }
     axios.post(esearch_url + "/" + index_name + "/" + type_name + "/_bulk" + "?pretty", data, {
         headers: {
