@@ -27,13 +27,14 @@ console.log("> elastic search server: " + esearch_url);
 
 const index_name = "id";
 const type_name = "mapping";
+const template_name = "t_search_key_taxon";
 const max_docs_per_post = 1000;
 const wait_after_submit = 1;
 
 
 if(willCreateIndex) {
     createIndex(index_name);
-    createTemplate("t_search_key_taxon");
+    createTemplate(template_name);
     sleep.sleep(2);
 }
 
