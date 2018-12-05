@@ -19,7 +19,7 @@ const file = args[1];
 const taxon = args[2];
 
 let willCreateIndex = false;
-if(args.length == 4) {
+if (args.length == 4) {
     willCreateIndex = (args[3] == "true");
 }
 
@@ -32,7 +32,7 @@ const max_docs_per_post = 1000;
 const wait_after_submit = 1;
 
 
-if(willCreateIndex) {
+if (willCreateIndex) {
     createIndex(index_name);
     createTemplate(template_name);
     sleep.sleep(2);
@@ -61,10 +61,10 @@ readline.createInterface({
     console.log(lineCount + " lines read (" + docCount + " docs)");
 });
 
-gzFileInput.on('data', function(data) {
+gzFileInput.on('data', function (data) {
     gunzip.write(data);
 });
-gzFileInput.on('end', function() {
+gzFileInput.on('end', function () {
     gunzip.end();
 });
 
@@ -72,20 +72,20 @@ let current = undefined;
 let lines = undefined;
 function parse(line) {
     let split = line.split("\t");
-    if(current != id(split[0])) {
+    if (current != id(split[0])) {
         // add the taxon based on user parameter
-        if(lines && lines.length > 0) {
+        if (lines && lines.length > 0) {
             // I don't think we have the UniProtKB-AC field yet ?
-            lines.push([lines[lines.length - 1][0], "UniProtKB-AC", lines[lines.length - 1][0] ]);
-            
+            lines.push([lines[lines.length - 1][0], "UniProtKB-AC", lines[lines.length - 1][0]]);
+
             // manually add the NCBI_TaxID if missing
             let found = false;
-            for(let line of lines) {
-                if(line[1] == "NCBI_TaxID")
+            for (let line of lines) {
+                if (line[1] == "NCBI_TaxID")
                     found = true;
             }
-            if(!found) { 
-                console.log("NCBI_TaxID was not present for " , lines);
+            if (!found) {
+                console.log("NCBI_TaxID was not present for ", lines);
                 lines.push([lines[lines.length - 1][0], "NCBI_TaxID", taxon]);
             }
         }
@@ -102,7 +102,7 @@ function parse(line) {
  */
 function id(id) {
     let pos = id.indexOf("-");
-    if(pos == -1) return id;
+    if (pos == -1) return id;
     return id.substring(0, pos);
 }
 
@@ -111,11 +111,11 @@ function id(id) {
  * @param {*} lines 
  */
 function addMap(lines) {
-    let data = { };
+    let data = {};
 
-    if(lines && lines.length > 0) {
+    if (lines && lines.length > 0) {
         let set = new Set();
-        for(let line of lines) {
+        for (let line of lines) {
             data[line[1]] = line[2];
             set.add(line[2]);
             set.add(line[0]);
@@ -128,56 +128,56 @@ function addMap(lines) {
         data = undefined;
     }
 
-    if(docs.length >= max_docs_per_post) {
+    if (docs.length >= max_docs_per_post) {
         submit();
         docs = [];
     }
 
-    if(data)
+    if (data)
         docs.push(data);
 
 }
 
 function submit() {
-    if(docs.length == 0) return;
+    if (docs.length == 0) return;
 
     console.log("Submit " + docs.length + " docs\t (total: " + docCount + ")");
     let data = "";
-    for(let doc of docs) {
+    for (let doc of docs) {
         data += "{\"index\": {\"_id\": \"" + doc["UniProtKB-AC"] + "\"} }\n" + JSON.stringify(doc) + "\n";
     }
     axios.post(esearch_url + "/" + index_name + "/" + type_name + "/_bulk" + "?pretty", data, {
         headers: {
             'Content-Type': 'application/json',
         }
-    })    
-    .then(response => {
-//        console.log(response);
     })
-    .catch(error => {
-        console.error(error);
-        console.error("DATA: ", data);
-    });
+        .then(response => {
+            //        console.log(response);
+        })
+        .catch(error => {
+            console.error(error);
+            console.error("DATA: ", data);
+        });
     sleep.sleep(wait_after_submit);
 }
 
 function deleteIndex(name) {
     axios.delete(esearch_url + "/" + name + "?pretty")
-    .then(response => {
-        console.log("Index <" + name + "> was successfully deleted");
-    })
-    .catch(error => {
-        console.error(error);
-    });
+        .then(response => {
+            console.log("Index <" + name + "> was successfully deleted");
+        })
+        .catch(error => {
+            console.error(error);
+        });
 }
 
 function createIndex(name) {
-    let data = 
+    let data =
         {
             "settings": {
                 "number_of_shards": 2,
                 "number_of_replicas": 0,
-                            
+
                 "analysis": {
                     "filter": {
                         "autocomplete_filter": {
@@ -198,13 +198,23 @@ function createIndex(name) {
                     }
                 }
             },
+
             "mappings": {
                 "mapping": {
                     "properties": {
                         "all": {
                             "type": "text",
                             "analyzer": "autocomplete",
-                            "search_analyzer": "standard"
+                            "search_analyzer": "standard",
+                            "norms": {
+                                "enabled": false
+                            }
+                        },
+                        "any": {
+                            "type": "text",
+                            "norms": {
+                                "enabled": false
+                            }
                         }
                     }
                 }
@@ -214,55 +224,55 @@ function createIndex(name) {
         headers: {
             'Content-Type': 'application/json',
         }
-    })    
-    .then(response => {
-        console.log("Index <" + name + "> was successfully created");
     })
-    .catch(error => {
-        console.error(error);
-    });
+        .then(response => {
+            console.log("Index <" + name + "> was successfully created");
+        })
+        .catch(error => {
+            console.error(error);
+        });
 }
 
 
 function createTemplate(template_name) {
-    let data = 
-    {
-        "script": {
-            "lang": "mustache",
-            "source": {
-                "_source": { "excludes": ["all", "any"] },
-                "size": 1,
-                "query": {
-                    "bool": {
-                        "must": [
-                            { "term": { "NCBI_TaxID": "{{taxon_id}}" } },
-                            { "term": { "any": "{{query_string}}" } }
-                        ]
+    let data =
+        {
+            "script": {
+                "lang": "mustache",
+                "source": {
+                    "_source": { "excludes": ["all", "any"] },
+                    "size": 1,
+                    "query": {
+                        "bool": {
+                            "must": [
+                                { "term": { "NCBI_TaxID": "{{taxon_id}}" } },
+                                { "term": { "any": "{{query_string}}" } }
+                            ]
+                        }
                     }
                 }
             }
-        }
-    };
+        };
     axios.put(esearch_url + "/_scripts/" + template_name + "?pretty", JSON.stringify(data), {
         headers: {
             'Content-Type': 'application/json',
         }
-    })    
-    .then(response => {
-        console.log("Query template <" + template_name + "> was successfully created");
     })
-    .catch(error => {
-        console.error(error);
-    });
+        .then(response => {
+            console.log("Query template <" + template_name + "> was successfully created");
+        })
+        .catch(error => {
+            console.error(error);
+        });
 }
 
 
 function listIndex() {
     axios.get(esearch_url + "/_cat/indices?v&pretty")
-    .then(response => {
-        console.log(response);
-    })
-    .catch(error => {
-        console.error(error);
-    });
+        .then(response => {
+            console.log(response);
+        })
+        .catch(error => {
+            console.error(error);
+        });
 }
