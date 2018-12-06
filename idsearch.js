@@ -236,24 +236,38 @@ function createIndex(name) {
 
 function createTemplate(template_name) {
     let data =
-        {
-            "script": {
-                "lang": "mustache",
-                "source": {
-                    "_source": { "excludes": ["all", "any"] },
-                    "size": 1,
-                    "query": {
-                        "bool": {
-                            "must": [
-                                { "term": { "NCBI_TaxID": "{{taxon_id}}" } },
-                                { "term": { "any": "{{query_string}}" } }
-                            ]
+    {
+        "script": {
+            "lang": "mustache",
+            "source": {
+                "size": 1,
+                "_source": { "excludes": ["all", "any"] },
+                
+                "query": {
+                    "bool": {                    
+                        "must": {
+                            "term": {
+                            "any": "{{query_string}}"
+                            }
+                        },
+                            
+                        "should": {
+                            "prefix": {
+                            "UniProtKB-ID": "{{query_string}}"
+                            }
+                        },
+                    
+                        "filter": {
+                            "term": { "NCBI_TaxID": "{{taxon_id}}" }
                         }
                     }
                 }
+    
             }
-        };
-    axios.put(esearch_url + "/_scripts/" + template_name + "?pretty", JSON.stringify(data), {
+        }
+    };
+    
+        axios.put(esearch_url + "/_scripts/" + template_name + "?pretty", JSON.stringify(data), {
         headers: {
             'Content-Type': 'application/json',
         }
