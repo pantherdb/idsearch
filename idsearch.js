@@ -247,13 +247,13 @@ function createTemplate(template_name) {
                     "bool": {                    
                         "must": {
                             "term": {
-                            "any": "{{query_string}}"
+                                "any": "{{query_string}}"
                             }
                         },
                             
                         "should": {
                             "prefix": {
-                            "UniProtKB-ID": "{{query_string}}"
+                                "UniProtKB-ID": "{{query_string}}"
                             }
                         },
                     
